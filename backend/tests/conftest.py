@@ -41,6 +41,8 @@ def client():
                     raise
 
         app.dependency_overrides[get_db] = session_override
+        # Each test client represents an isolated application run, including auth throttles.
+        app.state.auth_limiter.reset()
         with TestClient(app) as test_client:
             yield test_client
         app.dependency_overrides.clear()

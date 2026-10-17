@@ -1,5 +1,10 @@
 # Verification — 17 October 2026
 
+Historical development verification. For the subsequent production hardening,
+current checks and cloud verification boundaries, see the
+[production readiness report](../PRODUCTION_READINESS_REPORT.md) and
+[deployment guide](DEPLOYMENT.md). Statements below describe the earlier run.
+
 TaskFlow is implemented and running locally. It is **not yet a fully verified v1.0 release**, because Docker startup and the hosted GitHub Actions workflow could not be executed on this machine.
 
 ## Executed checks

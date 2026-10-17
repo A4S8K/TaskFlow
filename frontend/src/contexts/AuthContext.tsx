@@ -1,7 +1,9 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -22,33 +24,40 @@ const Context = createContext<Auth | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const cache = useQueryClient();
-  function logout() {
+  const authGeneration = useRef(0);
+  const logout = useCallback(() => {
+    authGeneration.current++;
     setAccessToken(null);
     setUser(null);
     cache.clear();
-  }
+  }, [cache]);
   useEffect(() => {
     setUnauthorizedHandler(() => {
       logout();
       toast.error(i18n.t("auth.sessionExpired"));
     });
     return () => setUnauthorizedHandler(null);
-    // The handler only needs the stable query client and state setter.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cache]);
+  }, [logout]);
   async function login(email: string, password: string) {
+    const generation = ++authGeneration.current;
+    setAccessToken(null);
+    setUser(null);
+    cache.clear();
     const result = await write<{ access_token: string }>(
       "post",
       "/auth/login",
       { email, password },
     );
+    if (authGeneration.current !== generation) return;
     setAccessToken(result.access_token);
     try {
       const profile = await meApi();
+      if (authGeneration.current !== generation) return;
       cache.clear();
       setUser(profile);
       await i18n.changeLanguage(profile.preferred_language);
     } catch (error) {
+      if (authGeneration.current !== generation) return;
       logout();
       throw error;
     }

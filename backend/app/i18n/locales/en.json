@@ -20,6 +20,8 @@
   "VALIDATION_ERROR": "Invalid request data",
   "INTERNAL_ERROR": "An internal error occurred",
   "DOC_TITLE": "TaskFlow API",
+  "SERVICE_UNAVAILABLE": "Service temporarily unavailable. Please try again later.",
+  "RATE_LIMITED": "Too many attempts. Please try again later.",
   "DOC_DESCRIPTION": "Collaborative project and task management",
   "DOC_VERBS": {
     "get": "Read",

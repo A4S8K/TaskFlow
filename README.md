@@ -33,10 +33,13 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 Edit `.env`: set a random URL-safe `POSTGRES_PASSWORD` and an independently generated `JWT_SECRET` of at least 32 characters. Configure `POSTGRES_USER` and `POSTGRES_DB` if needed. Never commit `.env`.
 
 ```powershell
-docker compose up --build
+docker compose up -d --wait db
+docker compose build
+docker compose run --rm backend alembic upgrade head
+docker compose up backend frontend
 ```
 
-Open [TaskFlow](http://localhost:5173), choose **Create account**, enter a unique username, valid email and password, then sign in. Create a project and tasks. Teammates must register before being added by email. PostgreSQL uses a persistent volume; the backend waits for database health and applies migrations automatically.
+Open [TaskFlow](http://localhost:5173), choose **Create account**, enter a unique username, valid email and password, then sign in. Create a project and tasks. Teammates must register before being added by email. PostgreSQL uses a persistent volume. Migrations are an explicit release step; application startup does not change the schema.
 
 API: [health](http://localhost:8000/api/v1/health), [Swagger](http://localhost:8000/docs), [ReDoc](http://localhost:8000/redoc), localized docs at `/docs/en`, `/docs/ru`, `/docs/kk`.
 
@@ -49,12 +52,13 @@ Stopping preserves data. Removing the database volume deletes data.
 
 ## Manual installation and database setup
 
-Install Python 3.12+, Node 22.12+ and PostgreSQL 17. PowerShell commands:
+Install a supported patched Python 3.12+, Node 22.13+ and PostgreSQL 17. PowerShell commands:
 
 ```powershell
 createuser -U postgres --pwprompt taskflow
 createdb -U postgres -O taskflow taskflow
 python -m venv backend/.venv
+backend/.venv/Scripts/python.exe -m pip install --upgrade pip==26.2
 backend/.venv/Scripts/python.exe -m pip install -c backend/constraints.txt -e 'backend[test]'
 Copy-Item backend/.env.example backend/.env
 ```
@@ -83,7 +87,7 @@ Copy-Item .env.example .env
 npm.cmd run dev
 ```
 
-`VITE_API_URL=http://localhost:8000` is public configuration. Never put backend secrets in `VITE_` variables. An empty API URL uses the current origin for the production proxy. On Linux/macOS use `.venv/bin/python` and `npm` instead of Windows executable paths.
+`VITE_API_URL=http://localhost:8000` is development-only public configuration. Production external mode requires a public HTTPS API origin. Only the explicit `VITE_API_MODE=same-origin` with an empty API URL uses the Docker/Nginx proxy; Vercel requires external mode. Never put backend secrets in `VITE_` variables. On Linux/macOS use `.venv/bin/python` and `npm` instead of Windows executable paths.
 
 ## Tests
 
@@ -107,8 +111,11 @@ Without `TEST_DATABASE_URL`, integration tests explicitly skip. A passing run mu
 ```powershell
 cd frontend
 npm.cmd run typecheck
+npm.cmd run lint
 npm.cmd test
+$env:VITE_API_URL='https://api.taskflow.invalid' # Synthetic compile-only origin
 npm.cmd run build
+$env:VITE_API_URL='http://localhost:8000' # Disposable development API for browser tests
 npx.cmd playwright install chromium
 npm.cmd run test:e2e
 ```
@@ -118,10 +125,17 @@ Playwright requires the API on port 8000 and starts or reuses the frontend on 51
 ## Production
 
 ```powershell
-docker compose -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.prod.yml up -d --wait db
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+docker compose -f docker-compose.prod.yml up -d backend frontend
 ```
 
-Open [localhost:8080](http://localhost:8080). Nginx serves the optimized build and proxies API calls on the same origin. Database/API ports are private. Configure HTTPS termination, backups and unique secrets before publishing publicly.
+Open [localhost:8080](http://localhost:8080). This is a local production-build profile using development security settings for loopback HTTP/PostgreSQL. Nginx serves the optimized build and proxies API calls on the same origin. Database/API ports are private. For cloud production, follow the validated HTTPS/TLS configuration in the deployment runbook; do not expose this local profile publicly.
+
+Cloud preparation: [Audit](docs/PRODUCTION_AUDIT.md) · [Deployment](docs/DEPLOYMENT.md) · [Release checklist](docs/PRODUCTION_CHECKLIST.md) · [Migrations](docs/DATABASE_MIGRATIONS.md) · [Backup/recovery](docs/BACKUP_RECOVERY.md) · [Security](docs/SECURITY.md) · [Actual readiness report](PRODUCTION_READINESS_REPORT.md).
+
+No cloud deployment was performed. Hosted connectivity, HTTPS/proxy behavior and live backups require separate verification; source preparation alone does not confirm production readiness. For a local production build, set an actual public HTTPS `VITE_API_URL` or use the documented explicit same-origin Docker profile before running `npm run build`.
 
 ## Architecture and API
 
@@ -148,7 +162,7 @@ screenshots/       real application captures
 
 ## Future improvements
 
-Secure HTTP-only cookie refresh sessions, password recovery, verified email, public-host rate limiting, invitations, ownership transfer and persisted task ordering are outside v1. There are no nonfunctional controls for them.
+Secure HTTP-only cookie refresh sessions, password recovery, verified email, distributed abuse protection, invitations, ownership transfer and persisted task ordering are outside v1. The included bounded authentication limiter requires one worker and one instance. There are no nonfunctional controls for future features.
 
 [MIT license](LICENSE).
 

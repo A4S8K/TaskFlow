@@ -24,10 +24,13 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 `POSTGRES_PASSWORD` мәнін URL үшін қауіпсіз кездейсоқ құпиясөзге, `JWT_SECRET` мәнін кемінде 32 таңбалы бөлек кездейсоқ құпияға ауыстырыңыз. `.env` жарияламаңыз.
 
 ```powershell
-docker compose up --build
+docker compose up -d --wait db
+docker compose build
+docker compose run --rm backend alembic upgrade head
+docker compose up backend frontend
 ```
 
-[Қолданбаны](http://localhost:5173) ашып, бірегей ат, пошта және құпиясөзбен тіркеліңіз, содан кейін кіріңіз. Жоба мен тапсырмалар құрыңыз. Команда мүшелері қосылу алдында тіркелуі керек. Миграциялар автоматты орындалады. Деректер тұрақты томда сақталады.
+[Қолданбаны](http://localhost:5173) ашып, бірегей ат, пошта және құпиясөзбен тіркеліңіз, содан кейін кіріңіз. Жоба мен тапсырмалар құрыңыз. Команда мүшелері қосылу алдында тіркелуі керек. Миграциялар жоғарыдағы бөлек пәрменмен орындалады. Деректер тұрақты томда сақталады.
 
 API: [Swagger](http://localhost:8000/docs), [ReDoc](http://localhost:8000/redoc), [/docs/kk](http://localhost:8000/docs/kk).
 
@@ -38,12 +41,13 @@ docker compose down
 
 ## Орнату
 
-Python 3.12+, Node 22.12+, PostgreSQL 17. PowerShell:
+Қауіпсіздік жаңартулары бар Python 3.12+, Node 22.13+, PostgreSQL 17. PowerShell:
 
 ```powershell
 createuser -U postgres --pwprompt taskflow
 createdb -U postgres -O taskflow taskflow
 python -m venv backend/.venv
+backend/.venv/Scripts/python.exe -m pip install --upgrade pip==26.2
 backend/.venv/Scripts/python.exe -m pip install -c backend/constraints.txt -e 'backend[test]'
 Copy-Item backend/.env.example backend/.env
 ```
@@ -96,8 +100,11 @@ $env:DATABASE_URL=$appDatabase
 ```powershell
 cd frontend
 npm.cmd run typecheck
+npm.cmd run lint
 npm.cmd test
+$env:VITE_API_URL='https://api.taskflow.invalid' # Тек компиляцияға арналған сынақ мекенжайы
 npm.cmd run build
+$env:VITE_API_URL='http://localhost:8000' # Playwright үшін бір реттік жергілікті API
 npx.cmd playwright install chromium
 npm.cmd run test:e2e
 ```
@@ -107,10 +114,13 @@ npm.cmd run test:e2e
 ## Өндірістік жинақ
 
 ```powershell
-docker compose -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.prod.yml up -d --wait db
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+docker compose -f docker-compose.prod.yml up -d backend frontend
 ```
 
-[localhost:8080](http://localhost:8080). Nginx дайын жинақты таратып, API сұрауларын бағыттайды. Дерекқор мен API порттары сыртқа ашылмайды. Жариялау үшін HTTPS, сақтық көшірме және құпиялар баптаңыз.
+[localhost:8080](http://localhost:8080). Бұл loopback HTTP және PostgreSQL үшін әзірлеу баптауларымен дайын жинақты жергілікті тексеру. Nginx жинақты таратып, API сұрауларын бағыттайды. Бұлтқа жариялау үшін [Vercel/Render/Supabase нұсқаулығын](docs/DEPLOYMENT.md) және [қорытынды есепті](PRODUCTION_READINESS_REPORT.md) қараңыз. Нақты орналастыру орындалған жоқ; бұлттағы дайындық әлі расталмаған.
 
 ## Архитектура және API
 
@@ -128,7 +138,7 @@ flowchart LR
 
 ## Болашақ жетілдірулер
 
-HTTP-only cookie арқылы сессия жаңарту, құпиясөз қалпына келтіру, поштаны растау, сұрау жиілігін шектеу, шақыру, меншік құқығын беру және карточка ретін сақтау v1 құрамына кірмейді.
+HTTP-only cookie арқылы сессия жаңарту, құпиясөз қалпына келтіру, поштаны растау, таратылған теріс пайдаланудан қорғау, шақыру, меншік құқығын беру және карточка ретін сақтау v1 құрамына кірмейді. Кіру сұрауларының жиілігі мен параллельдігі бір процесс және бір сервер данасы үшін шектелген.
 
 [MIT](LICENSE).
 

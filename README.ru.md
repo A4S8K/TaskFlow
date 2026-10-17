@@ -24,10 +24,13 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 Замените `POSTGRES_PASSWORD` случайным паролем без специальных символов URL, а `JWT_SECRET` — отдельным случайным секретом длиной от 32 символов. Не публикуйте `.env`.
 
 ```powershell
-docker compose up --build
+docker compose up -d --wait db
+docker compose build
+docker compose run --rm backend alembic upgrade head
+docker compose up backend frontend
 ```
 
-Откройте [приложение](http://localhost:5173), создайте учётную запись с уникальным именем, почтой и паролем, затем войдите. Создайте проект и задачи; участники должны зарегистрироваться перед добавлением по почте. Миграции выполняются автоматически. Данные сохраняются в томе.
+Откройте [приложение](http://localhost:5173), создайте учётную запись с уникальным именем, почтой и паролем, затем войдите. Создайте проект и задачи; участники должны зарегистрироваться перед добавлением по почте. Миграции выполняются отдельной явной командой выше. Данные сохраняются в томе.
 
 API: [Swagger](http://localhost:8000/docs), [ReDoc](http://localhost:8000/redoc), [/docs/ru](http://localhost:8000/docs/ru).
 
@@ -38,12 +41,13 @@ docker compose down
 
 ## Установка
 
-Python 3.12+, Node 22.12+, PostgreSQL 17. PowerShell:
+Python 3.12+ с актуальными исправлениями, Node 22.13+, PostgreSQL 17. PowerShell:
 
 ```powershell
 createuser -U postgres --pwprompt taskflow
 createdb -U postgres -O taskflow taskflow
 python -m venv backend/.venv
+backend/.venv/Scripts/python.exe -m pip install --upgrade pip==26.2
 backend/.venv/Scripts/python.exe -m pip install -c backend/constraints.txt -e 'backend[test]'
 Copy-Item backend/.env.example backend/.env
 ```
@@ -96,8 +100,11 @@ $env:DATABASE_URL=$appDatabase
 ```powershell
 cd frontend
 npm.cmd run typecheck
+npm.cmd run lint
 npm.cmd test
+$env:VITE_API_URL='https://api.taskflow.invalid' # Тестовый адрес только для компиляции
 npm.cmd run build
+$env:VITE_API_URL='http://localhost:8000' # Одноразовый локальный API для Playwright
 npx.cmd playwright install chromium
 npm.cmd run test:e2e
 ```
@@ -107,10 +114,13 @@ npm.cmd run test:e2e
 ## Промышленная сборка
 
 ```powershell
-docker compose -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.prod.yml up -d --wait db
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+docker compose -f docker-compose.prod.yml up -d backend frontend
 ```
 
-[localhost:8080](http://localhost:8080). Nginx раздаёт готовую сборку и проксирует API. База и API не имеют внешних портов. Для публикации настройте HTTPS, резервные копии и секреты.
+[localhost:8080](http://localhost:8080). Это локальная проверка готовой сборки с настройками разработки для HTTP и PostgreSQL на loopback. Nginx раздаёт сборку и проксирует API. Для облачной публикации используйте [руководство Vercel/Render/Supabase](docs/DEPLOYMENT.md) и [итоговый отчёт](PRODUCTION_READINESS_REPORT.md). Реальное развёртывание не выполнено; облачная готовность пока не подтверждена.
 
 ## Архитектура и API
 
@@ -128,7 +138,7 @@ flowchart LR
 
 ## Развитие
 
-Безопасное обновление сессии через HTTP-only cookie, восстановление пароля, подтверждение почты, ограничение частоты запросов, приглашения, передача владения и порядок карточек — вне v1.
+Безопасное обновление сессии через HTTP-only cookie, восстановление пароля, подтверждение почты, распределённая защита от злоупотреблений, приглашения, передача владения и порядок карточек — вне v1. Ограничение частоты и параллельности входа уже реализовано для одного процесса и одного экземпляра сервера.
 
 [MIT](LICENSE).
 

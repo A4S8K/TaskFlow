@@ -1,0 +1,41 @@
+# Preparation only. Applying this Blueprint creates infrastructure and deploys it.
+# Do not apply until cloud settings, migrations and deployment are approved.
+services:
+  - type: web
+    name: taskflow-api
+    runtime: python
+    rootDir: backend
+    buildCommand: python -m pip install --upgrade pip==26.2 && python -m pip install --no-cache-dir -c constraints.txt .
+    startCommand: python start.py
+    healthCheckPath: /ready
+    autoDeployTrigger: 'off'
+    numInstances: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.15
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: 'false'
+      - key: WEB_CONCURRENCY
+        value: '1'
+      - key: DB_POOL_MODE
+        value: session
+      - key: DB_POOL_SIZE
+        value: '5'
+      - key: DB_MAX_OVERFLOW
+        value: '5'
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: TRUSTED_HOSTS
+        sync: false
+      - key: TRUSTED_PROXY_IPS
+        sync: false

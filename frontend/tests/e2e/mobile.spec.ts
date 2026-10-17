@@ -10,7 +10,7 @@ test("mobile navigation, responsive layout, and memory-only session", async ({
   const email = `mobile${unique}@example.com`;
   const password = `Mobile-${unique}-password`;
   const registration = await request.post(
-    "http://localhost:8000/api/v1/auth/register",
+    `${process.env.PLAYWRIGHT_API_URL || "http://localhost:8000"}/api/v1/auth/register`,
     { data: { username: `mobile${unique}`, email, password } },
   );
   expect(registration.status()).toBe(201);

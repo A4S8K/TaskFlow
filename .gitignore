@@ -248,6 +248,13 @@ ENV/
 *.sqlite
 *.sqlite3
 *.dump
+*.backup
+*.sql.gz
+backups/
+pg_service.conf
+.pg_service.conf
+pgpass.conf
+.pgpass
 
 # Private keys and local credentials
 *.pem

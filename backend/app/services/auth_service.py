@@ -6,8 +6,11 @@ from app.core.security import create_token, hash_password, verify_password
 from app.models import User
 from app.schemas import Login, Register
 
-# Verify a fixed hash on unknown-email logins to avoid a cheap timing distinction.
-DUMMY_HASH = hash_password("unused-timing-equalizer")
+# Public non-credential hash: unknown-email logins still perform an Argon2 check.
+# Keeping this constant also avoids random work at module import/startup.
+DUMMY_HASH = (
+    "$argon2id$v=19$m=65536,t=3,p=4$zgfhzJqJB5UKXPm3UyICHQ$gA1qSN03QSDBPxNoTI1d+ZYfFqU6yR56uMj7YgUkjkU"
+)
 
 
 def register(db: Session, body: Register) -> User:
