@@ -34,7 +34,7 @@ jobs:
       - run: python -m pip install -c constraints.txt -e '.[test]'
       - run: ruff check .
       - run: DATABASE_URL="$TEST_DATABASE_URL" alembic upgrade head
-      - run: pytest -q
+      - run: python -m pytest -q
       - run: DATABASE_URL="$TEST_DATABASE_URL" alembic check
   frontend:
     runs-on: ubuntu-latest
