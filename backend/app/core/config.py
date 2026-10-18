@@ -1,5 +1,6 @@
 import ipaddress
 import json
+import re
 from functools import lru_cache
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
@@ -74,6 +75,13 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
     trusted_hosts: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1", "[::1]", "testserver"]
     trusted_proxy_ips: str = "127.0.0.1"
+    ingress_mode: Literal["explicit-proxy", "render-free"] = "explicit-proxy"
+    render_free_ingress_ack: bool = False
+    render: str | None = None
+    render_service_id: str | None = None
+    render_service_type: str | None = None
+    render_external_hostname: str | None = None
+    render_cpu_count: str | None = None
     web_concurrency: int = Field(default=1, ge=1, le=32)
     auth_login_limit: int = Field(default=10, ge=1, le=100)
     auth_register_limit: int = Field(default=5, ge=1, le=100)
@@ -168,6 +176,27 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def production_requirements(self):
+        # Only Free public web services cannot receive private-network traffic.
+        # Plan changes require a new ingress review; these platform markers and
+        # the explicit operator acknowledgment guard against accidental reuse.
+        # https://render.com/docs/free
+        # https://render.com/docs/environment-variables
+        if self.ingress_mode == "render-free" and (
+            self.app_env != "production"
+            or not self.render_free_ingress_ack
+            or self.render != "true"
+            or self.render_service_type != "web"
+            # Catalog lists 0.1; the API-confirmed Free release reports 0.15.
+            or self.render_cpu_count not in {"0.1", "0.15"}
+            or not re.fullmatch(r"srv-[a-z0-9]+", self.render_service_id or "")
+            or not self.render_external_hostname
+            or not self.render_external_hostname.endswith(".onrender.com")
+            or urlsplit(self.backend_url or "").hostname != self.render_external_hostname
+        ):
+            raise ValueError(
+                "render-free ingress requires production, explicit Free-plan acknowledgment, "
+                "Render Free web-service platform markers and the matching onrender.com backend URL"
+            )
         if self.app_env != "production":
             return self
         required = {
@@ -177,8 +206,9 @@ class Settings(BaseSettings):
             "backend_url",
             "cors_origins",
             "trusted_hosts",
-            "trusted_proxy_ips",
         }
+        if self.ingress_mode == "explicit-proxy":
+            required.add("trusted_proxy_ips")
         missing = required - self.model_fields_set
         if missing:
             raise ValueError("Production requires explicit settings: " + ", ".join(sorted(missing)))

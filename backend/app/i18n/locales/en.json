@@ -18,6 +18,7 @@
   "CONFLICT": "Resource already exists or conflicts with current state",
   "INVALID_ASSIGNEE": "Assignee must be a project member",
   "VALIDATION_ERROR": "Invalid request data",
+  "INVALID_INGRESS": "Invalid request.",
   "INTERNAL_ERROR": "An internal error occurred",
   "DOC_TITLE": "TaskFlow API",
   "SERVICE_UNAVAILABLE": "Service temporarily unavailable. Please try again later.",

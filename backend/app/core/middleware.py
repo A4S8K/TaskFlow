@@ -1,3 +1,4 @@
+import ipaddress
 import logging
 import math
 import time
@@ -14,6 +15,70 @@ from app.core.config import Settings
 from app.i18n.translator import response
 
 logger = logging.getLogger("taskflow")
+
+
+class RenderFreeIngressMiddleware:
+    """Adapt Render Free public ingress without trusting caller-supplied XFF.
+
+    Render documents edge HTTPS termination, no private inbound traffic on Free,
+    and Cloudflare overwriting CF-Connecting-IP on public web-service requests:
+    https://render.com/docs/web-services
+    https://render.com/docs/free
+    https://render.com/articles/host-pocketbase-on-render
+    This contract must be re-reviewed before changing the service's compute plan.
+    """
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        headers = scope.get("headers", [])
+        client_values = [value for name, value in headers if name.lower() == b"cf-connecting-ip"]
+        proto_values = [value for name, value in headers if name.lower() == b"x-forwarded-proto"]
+        probe = scope["method"] == "GET" and scope.get("path") in {"/health", "/ready", "/api/v1/health"}
+        # Internal GET probes may bypass Cloudflare. They remain HTTP, execute the
+        # real health/database check and still pass TrustedHostMiddleware. Never
+        # permit this exception for authentication, API data or documentation.
+        if probe and not client_values and (not proto_values or proto_values in ([b"http"], [b"https"])):
+            await self.app(scope, receive, send)
+            return
+        try:
+            if len(client_values) != 1 or proto_values != [b"https"]:
+                raise ValueError()
+            value = client_values[0].decode("ascii")
+            if len(value) > 45 or value != value.strip() or "%" in value:
+                raise ValueError()
+            address = ipaddress.ip_address(value)
+            if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+                address = address.ipv4_mapped
+            if not address.is_global or address.is_multicast or address.is_reserved:
+                raise ValueError()
+        except (ValueError, UnicodeError):
+            result = JSONResponse(
+                response(Request(scope), "INVALID_INGRESS"),
+                status_code=400,
+                headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+            )
+            await result(scope, receive, send)
+            return
+        # XFP is a consistency check, not the source of HTTPS trust: Render's
+        # public edge redirects HTTP before forwarding. Discard ambiguous generic
+        # forwarding headers so only this adapter can establish scheme/client.
+        adapted = {
+            **scope,
+            "scheme": "https",
+            "client": (str(address), 0),
+            "headers": [
+                (name, value)
+                for name, value in headers
+                if name.lower() not in {b"forwarded", b"cf-connecting-ip", b"x-real-ip"}
+                and not name.lower().startswith(b"x-forwarded-")
+            ],
+        }
+        await self.app(adapted, receive, send)
 
 
 class HealthAwareHTTPSRedirectMiddleware(HTTPSRedirectMiddleware):

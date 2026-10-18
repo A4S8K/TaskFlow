@@ -14,6 +14,7 @@ def test_launcher_uses_explicit_proxy_and_single_worker(monkeypatch):
     assert observed["port"] == 18001
     assert observed["workers"] == 1
     assert observed["forwarded_allow_ips"] == settings.trusted_proxy_ips
+    assert observed["proxy_headers"] is True
     assert observed["access_log"] is False
 
 
@@ -43,3 +44,17 @@ def test_launcher_port_error_does_not_echo_input(monkeypatch, capsys):
     error = capsys.readouterr().err
     assert "PORT" in error
     assert "do-not-echo-input" not in error
+
+
+def test_launcher_disables_generic_proxy_headers_in_render_mode(monkeypatch):
+    # Configuration contract is exercised in test_render_ingress; isolate launcher
+    # routing here so no platform environment or database is needed.
+    settings = Settings(_env_file=None, jwt_secret_key=secrets.token_urlsafe(48))
+    settings = settings.model_copy(update={"ingress_mode": "render-free"})
+    observed = {}
+    monkeypatch.setattr(start, "get_settings", lambda: settings)
+    monkeypatch.setenv("PORT", "18001")
+    monkeypatch.setattr(start.uvicorn, "run", lambda *args, **kwargs: observed.update(kwargs))
+    assert start.main() == 0
+    assert observed["proxy_headers"] is False
+    assert observed["forwarded_allow_ips"] != "*"
