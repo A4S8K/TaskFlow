@@ -30,7 +30,7 @@ def main() -> int:
         host="0.0.0.0",
         port=port,
         workers=settings.web_concurrency,
-        proxy_headers=True,
+        proxy_headers=settings.ingress_mode == "explicit-proxy",
         forwarded_allow_ips=settings.trusted_proxy_ips,
         access_log=False,
         log_level="info",

@@ -17,6 +17,7 @@ from app.core.middleware import (
     AuthRateLimiter,
     AuthRateLimitMiddleware,
     HealthAwareHTTPSRedirectMiddleware,
+    RenderFreeIngressMiddleware,
     SafeErrorBoundary,
     SecurityHeadersMiddleware,
 )
@@ -38,7 +39,10 @@ class TaskFlow(FastAPI):
             expose_headers=["Retry-After"],
             allow_credentials=False,
         )
-        return SecurityHeadersMiddleware(stack, production=self.state.settings.app_env == "production")
+        stack = SecurityHeadersMiddleware(stack, production=self.state.settings.app_env == "production")
+        if self.state.settings.ingress_mode == "render-free":
+            stack = RenderFreeIngressMiddleware(stack)
+        return stack
 
 
 async def http_error(request: Request, exc: StarletteHTTPException):
