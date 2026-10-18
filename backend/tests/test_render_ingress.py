@@ -34,7 +34,7 @@ def render_settings(monkeypatch):
         "render_service_id": "srv-unittest",
         "render_service_type": "web",
         "render_external_hostname": "taskflow-ingress-test.onrender.com",
-        "render_cpu_count": "0.1",
+        "render_cpu_count": "0.15",
     }
 
     def build(**overrides):
@@ -111,6 +111,11 @@ def test_render_markers_can_be_read_from_platform_environment(render_settings, m
     )
     assert actual.render == "true"
     assert actual.render_service_type == "web"
+
+
+@pytest.mark.parametrize("cpu_count", ["0.1", "0.15"])
+def test_only_documented_or_observed_free_cpu_markers_are_accepted(render_settings, cpu_count):
+    assert render_settings(render_cpu_count=cpu_count).render_cpu_count == cpu_count
 
 
 @pytest.mark.parametrize(

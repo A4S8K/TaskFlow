@@ -186,7 +186,8 @@ class Settings(BaseSettings):
             or not self.render_free_ingress_ack
             or self.render != "true"
             or self.render_service_type != "web"
-            or self.render_cpu_count != "0.1"
+            # Catalog lists 0.1; the API-confirmed Free release reports 0.15.
+            or self.render_cpu_count not in {"0.1", "0.15"}
             or not re.fullmatch(r"srv-[a-z0-9]+", self.render_service_id or "")
             or not self.render_external_hostname
             or not self.render_external_hostname.endswith(".onrender.com")

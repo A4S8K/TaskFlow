@@ -40,13 +40,16 @@ them in the Blueprint or environment store:
 | `RENDER_SERVICE_TYPE` | `web` |
 | `RENDER_SERVICE_ID` | Actual `srv-...` service identifier |
 | `RENDER_EXTERNAL_HOSTNAME` | Actual public `onrender.com` hostname, matching `BACKEND_URL` |
-| `RENDER_CPU_COUNT` | Exact string `0.1`, the current Free web-service CPU count |
+| `RENDER_CPU_COUNT` | `0.1` from the catalog or `0.15` observed on this API-confirmed Free service |
 
 The marker names and values are documented in
 [default environment variables](https://render.com/docs/environment-variables).
 The current [compute-plan catalog](https://render.com/docs/compute-plans) lists
-Free web services with 0.1 CPU. The exact runtime string must still be verified
-on the deployed service. A missing or changed marker causes startup to fail;
+Free web services with 0.1 CPU. On 18 October 2026, service
+`srv-dbads8rncjis73d6h0i0` reported `RENDER_CPU_COUNT=0.15`, while the service API
+and dashboard both confirmed plan `free`. These two specific Free markers are
+accepted; the platform variables are never manually overridden. A missing or
+different marker causes startup to fail;
 these guards must not be bypassed to accommodate an unreviewed plan or platform
 change. They are configuration checks, not cryptographic attestation.
 
